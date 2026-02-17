@@ -53,6 +53,8 @@ function updateIndicator() {
                 font-weight: 500;
                 z-index: 9999;
                 pointer-events: none;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.15);
             `;
             document.body.appendChild(indicatorEl);
         }
