@@ -1,0 +1,25 @@
+post_install() {
+    echo ""
+    echo "==> CleverReply plugin installed to /usr/share/vencord-clever-reply/"
+    echo ""
+    echo "    To set up the plugin, run:"
+    echo "      /usr/share/vencord-clever-reply/install.sh"
+    echo ""
+    echo "    Or manually copy the files into your Vencord userplugins:"
+    echo "      mkdir -p ~/Vencord/src/userplugins/CleverReply"
+    echo "      cp /usr/share/vencord-clever-reply/{index.tsx,cleverbot.ts,native.ts} \\"
+    echo "         ~/Vencord/src/userplugins/CleverReply/"
+    echo "      cd ~/Vencord && pnpm build"
+    echo ""
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    echo ""
+    echo "==> CleverReply files removed from /usr/share/vencord-clever-reply/"
+    echo "    You may also want to remove ~/Vencord/src/userplugins/CleverReply/"
+    echo ""
+}

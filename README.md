@@ -11,19 +11,31 @@ A [Vencord](https://github.com/Vendicated/Vencord) plugin that adds a Cleverbot 
 - Uses Cleverbot's free web interface (no API key needed)
 - "Thinking..." toast notification while waiting for a response
 
-## One-Click Install (Windows)
+## Install (Arch Linux / AUR)
+
+```bash
+yay -S vencord-clever-reply-git
+```
+
+Then run the setup script:
+```bash
+/usr/share/vencord-clever-reply/install.sh
+```
+
+## Install (Linux)
+
+```bash
+git clone https://github.com/esqa/clever-reply.git
+cd clever-reply
+bash install.sh
+```
+
+The script handles everything: installs dependencies, clones Vencord, copies plugin files, builds, and injects into Discord.
+
+## Install (Windows)
 
 1. Download or clone this repo
 2. Right-click `install.ps1` → **Run with PowerShell**
-
-The script handles everything automatically:
-- Installs Git, Node.js, and pnpm (if missing)
-- Clones the Vencord source
-- Copies the plugin files
-- Builds Vencord
-- Injects into Discord
-
-After installation, open Discord and enable the plugin in **Settings → Vencord → Plugins → CleverReply**.
 
 ## Manual Install
 
@@ -45,6 +57,8 @@ After installation, open Discord and enable the plugin in **Settings → Vencord
 | `cleverbot.ts` | Cleverbot client — free scraping protocol, conversation state, inline MD5 |
 | `native.ts` | Electron main-process HTTP requests (bypasses CORS) |
 | `install.ps1` | Automated installer script for Windows |
+| `install.sh` | Automated installer script for Linux |
+| `PKGBUILD` | AUR package build file |
 
 ## Settings
 

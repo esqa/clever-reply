@@ -1,0 +1,17 @@
+pkgbase = vencord-clever-reply-git
+	pkgdesc = Vencord userplugin that adds a Cleverbot reply button to Discord messages
+	pkgver = r0
+	pkgrel = 1
+	url = https://github.com/esqa/clever-reply
+	install = vencord-clever-reply.install
+	arch = any
+	license = GPL-3.0-or-later
+	optdepends = git: required for Vencord source install
+	optdepends = nodejs: required to build Vencord
+	optdepends = pnpm: required to build Vencord
+	provides = vencord-clever-reply
+	conflicts = vencord-clever-reply
+	source = vencord-clever-reply-git::git+https://github.com/esqa/clever-reply.git
+	sha256sums = SKIP
+
+pkgname = vencord-clever-reply-git
