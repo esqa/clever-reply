@@ -11,7 +11,7 @@ import { definePluginSettings } from "@api/Settings";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { IconComponent, OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { ChannelStore, FluxDispatcher, Menu, showToast, Toasts, UserStore } from "@webpack/common";
+import { ChannelStore, FluxDispatcher, GuildStore, Menu, showToast, Toasts, UserStore, useState } from "@webpack/common";
 
 import { queryCleverbot } from "./cleverbot";
 import { PluginNative } from "@utils/types";
@@ -19,6 +19,7 @@ import { PluginNative } from "@utils/types";
 const Native = VencordNative.pluginHelpers.CleverReply as PluginNative<typeof import("./native")>;
 
 const autoReplyUsers = new Set<string>();
+const autoReplyChannels = new Set<string>();
 
 function saveAutoReplyUsers() {
     settings.store.autoReplyUserIds = JSON.stringify([...autoReplyUsers]);
@@ -28,6 +29,17 @@ function loadAutoReplyUsers() {
     try {
         const ids: string[] = JSON.parse(settings.store.autoReplyUserIds);
         for (const id of ids) autoReplyUsers.add(id);
+    } catch { }
+}
+
+function saveAutoReplyChannels() {
+    settings.store.autoReplyChannelIds = JSON.stringify([...autoReplyChannels]);
+}
+
+function loadAutoReplyChannels() {
+    try {
+        const ids: string[] = JSON.parse(settings.store.autoReplyChannelIds);
+        for (const id of ids) autoReplyChannels.add(id);
     } catch { }
 }
 
@@ -120,13 +132,222 @@ const settings = definePluginSettings({
         description: "Maximum seconds before auto-replying",
         default: 10,
     },
+    replyToReplies: {
+        type: OptionType.BOOLEAN,
+        description: "Auto-reply when someone replies to your messages",
+        default: false,
+    },
+    channelReplyChance: {
+        type: OptionType.SLIDER,
+        description: "Chance to reply to messages in auto-reply channels (%)",
+        default: 50,
+        markers: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        stickToMarkers: false,
+    },
     autoReplyUserIds: {
         type: OptionType.STRING,
         description: "User IDs with auto-reply enabled (managed automatically)",
         default: "[]",
         hidden: true,
     },
+    autoReplyChannelIds: {
+        type: OptionType.STRING,
+        description: "Channel IDs with auto-reply enabled (managed automatically)",
+        default: "[]",
+        hidden: true,
+    },
 });
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
+const panelStyle: React.CSSProperties = {
+    marginBottom: 16,
+};
+
+const sectionTitleStyle: React.CSSProperties = {
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    color: "var(--header-secondary)",
+    marginBottom: 8,
+};
+
+const listStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+};
+
+const itemStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 12px",
+    borderRadius: 6,
+    background: "var(--background-secondary)",
+};
+
+const itemNameStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+};
+
+const primaryTextStyle: React.CSSProperties = {
+    fontSize: 14,
+    fontWeight: 500,
+    color: "var(--text-normal)",
+};
+
+const secondaryTextStyle: React.CSSProperties = {
+    fontSize: 12,
+    color: "var(--text-muted)",
+};
+
+const removeBtnStyle: React.CSSProperties = {
+    background: "var(--button-danger-background)",
+    color: "white",
+    border: "none",
+    borderRadius: 4,
+    padding: "4px 12px",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+};
+
+const emptyStyle: React.CSSProperties = {
+    color: "var(--text-muted)",
+    fontSize: 13,
+    fontStyle: "italic",
+    padding: "4px 0",
+};
+
+// ── Settings Panel ───────────────────────────────────────────────────────────
+
+function AutoReplyPanel() {
+    const [, forceUpdate] = useState(0);
+    const rerender = () => forceUpdate(n => n + 1);
+
+    const userIds = [...autoReplyUsers];
+    const channelIds = [...autoReplyChannels];
+
+    function removeUser(id: string) {
+        autoReplyUsers.delete(id);
+        saveAutoReplyUsers();
+        rerender();
+    }
+
+    function removeChannel(id: string) {
+        autoReplyChannels.delete(id);
+        saveAutoReplyChannels();
+        rerender();
+    }
+
+    function clearAllUsers() {
+        autoReplyUsers.clear();
+        saveAutoReplyUsers();
+        rerender();
+    }
+
+    function clearAllChannels() {
+        autoReplyChannels.clear();
+        saveAutoReplyChannels();
+        rerender();
+    }
+
+    return (
+        <div style={panelStyle}>
+            <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={sectionTitleStyle}>Auto-Reply Users ({userIds.length})</span>
+                    {userIds.length > 0 && (
+                        <button style={{ ...removeBtnStyle, fontSize: 11, padding: "2px 8px" }} onClick={clearAllUsers}>
+                            Clear All
+                        </button>
+                    )}
+                </div>
+                <div style={listStyle}>
+                    {userIds.length === 0 ? (
+                        <span style={emptyStyle}>No users — right-click a user to enable auto-reply</span>
+                    ) : (
+                        userIds.map(id => {
+                            const user = UserStore.getUser(id);
+                            return (
+                                <div key={id} style={itemStyle}>
+                                    <div style={itemNameStyle}>
+                                        <span style={primaryTextStyle}>
+                                            {user ? `${user.username}${user.discriminator !== "0" ? `#${user.discriminator}` : ""}` : "Unknown User"}
+                                        </span>
+                                        <span style={secondaryTextStyle}>{id}</span>
+                                    </div>
+                                    <button style={removeBtnStyle} onClick={() => removeUser(id)}>Remove</button>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+            <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={sectionTitleStyle}>Auto-Reply Channels ({channelIds.length})</span>
+                    {channelIds.length > 0 && (
+                        <button style={{ ...removeBtnStyle, fontSize: 11, padding: "2px 8px" }} onClick={clearAllChannels}>
+                            Clear All
+                        </button>
+                    )}
+                </div>
+                <div style={listStyle}>
+                    {channelIds.length === 0 ? (
+                        <span style={emptyStyle}>No channels — right-click a channel to enable auto-reply</span>
+                    ) : (
+                        channelIds.map(id => {
+                            const channel = ChannelStore.getChannel(id);
+                            const guild = channel?.guild_id ? GuildStore.getGuild(channel.guild_id) : null;
+                            let name = "Unknown Channel";
+                            if (channel) {
+                                name = channel.name
+                                    ? `#${channel.name}`
+                                    : (channel.rawRecipients?.map((r: any) => r.username).join(", ") ?? "DM");
+                            }
+                            return (
+                                <div key={id} style={itemStyle}>
+                                    <div style={itemNameStyle}>
+                                        <span style={primaryTextStyle}>{name}</span>
+                                        <span style={secondaryTextStyle}>
+                                            {guild ? guild.name : "DM"} — {id}
+                                        </span>
+                                    </div>
+                                    <button style={removeBtnStyle} onClick={() => removeChannel(id)}>Remove</button>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+const ChannelContextMenuPatch: NavContextMenuPatchCallback = (children, { channel }: { channel?: { id: string; }; }) => {
+    if (!channel) return;
+    const active = autoReplyChannels.has(channel.id);
+    children.push(
+        <Menu.MenuItem
+            id="vc-cleverreply-channel-auto"
+            label={active ? "Stop Channel Auto Reply" : "Auto Reply Channel (Cleverbot)"}
+            action={() => {
+                if (active) autoReplyChannels.delete(channel.id);
+                else autoReplyChannels.add(channel.id);
+                saveAutoReplyChannels();
+                showToast(
+                    active
+                        ? "Channel auto-reply stopped"
+                        : `Channel auto-reply started (${settings.store.channelReplyChance}% chance)`,
+                    Toasts.Type.MESSAGE
+                );
+            }}
+        />
+    );
+};
 
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user?: { id: string; }; }) => {
     if (!user) return;
@@ -151,9 +372,11 @@ export default definePlugin({
     authors: [{ name: "CleverReply", id: 0n }],
     dependencies: ["MessageDecorationsAPI", "MemberListDecoratorsAPI"],
     settings,
+    settingsAboutComponent: AutoReplyPanel,
 
     start() {
         loadAutoReplyUsers();
+        loadAutoReplyChannels();
         addMessageDecoration("vc-cleverreply-auto", props => {
             if (!autoReplyUsers.has(props?.message?.author?.id)) return null;
             return (
@@ -174,14 +397,27 @@ export default definePlugin({
 
     contextMenus: {
         "user-context": UserContextMenuPatch,
+        "channel-context": ChannelContextMenuPatch,
+        "gdm-context": ChannelContextMenuPatch,
     },
 
     flux: {
         async MESSAGE_CREATE({ message, optimistic }: { message: any; optimistic: boolean; }) {
             if (optimistic) return;
-            if (!autoReplyUsers.has(message.author.id)) return;
             if (message.author.id === UserStore.getCurrentUser().id) return;
             if (!message.content) return;
+
+            const isUserAutoReply = autoReplyUsers.has(message.author.id);
+            const isChannelAutoReply = autoReplyChannels.has(message.channel_id);
+            const isReplyToMe = settings.store.replyToReplies
+                && message.referenced_message?.author?.id === UserStore.getCurrentUser().id;
+
+            if (!isUserAutoReply && !isChannelAutoReply && !isReplyToMe) return;
+
+            // For channel auto-reply (not user or reply-to-me), roll against the chance slider
+            if (isChannelAutoReply && !isUserAutoReply && !isReplyToMe) {
+                if (Math.random() * 100 >= settings.store.channelReplyChance) return;
+            }
 
             const min = settings.store.autoReplyMinDelay;
             const max = settings.store.autoReplyMaxDelay;
@@ -195,7 +431,20 @@ export default definePlugin({
 
                 let reply = await queryCleverbot(message.channel_id, message.content);
                 reply = applyTextSettings(reply);
-                sendMessage(message.channel_id, { content: reply });
+
+                // Send as a Discord reply when triggered by someone replying to us
+                if (isReplyToMe) {
+                    const replyOptions = MessageActions.getSendMessageOptionsForReply({
+                        type: 0,
+                        message,
+                        channel: ChannelStore.getChannel(message.channel_id),
+                        shouldMention: true,
+                    });
+                    sendMessage(message.channel_id, { content: reply }, true, replyOptions);
+                    FluxDispatcher.dispatch({ type: "DELETE_PENDING_REPLY", channelId: message.channel_id });
+                } else {
+                    sendMessage(message.channel_id, { content: reply });
+                }
             } catch (e) {
                 showToast(
                     `Auto-reply error: ${e instanceof Error ? e.message : String(e)}`,
@@ -209,6 +458,7 @@ export default definePlugin({
 
     stop() {
         autoReplyUsers.clear();
+        autoReplyChannels.clear();
         pendingCount = 0;
         updateIndicator();
         removeMessageDecoration("vc-cleverreply-auto");
