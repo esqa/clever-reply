@@ -33,6 +33,13 @@ async function ensureCookie(): Promise<string> {
     return cachedCookie;
 }
 
+export function sleep(
+    _: IpcMainInvokeEvent,
+    ms: number
+): Promise<void> {
+    return new Promise(r => setTimeout(r, ms));
+}
+
 export async function postCleverbot(
     _: IpcMainInvokeEvent,
     queryString: string,
