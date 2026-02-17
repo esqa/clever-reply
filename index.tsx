@@ -5,6 +5,8 @@
  */
 
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { addMemberListDecorator, removeMemberListDecorator } from "@api/MemberListDecorators";
+import { addMessageDecoration, removeMessageDecoration } from "@api/MessageDecorations";
 import { definePluginSettings } from "@api/Settings";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { IconComponent, OptionType } from "@utils/types";
@@ -17,6 +19,17 @@ import { PluginNative } from "@utils/types";
 const Native = VencordNative.pluginHelpers.CleverReply as PluginNative<typeof import("./native")>;
 
 const autoReplyUsers = new Set<string>();
+
+function saveAutoReplyUsers() {
+    settings.store.autoReplyUserIds = JSON.stringify([...autoReplyUsers]);
+}
+
+function loadAutoReplyUsers() {
+    try {
+        const ids: string[] = JSON.parse(settings.store.autoReplyUserIds);
+        for (const id of ids) autoReplyUsers.add(id);
+    } catch { }
+}
 
 const PendingReplyStore = findByPropsLazy("getPendingReply");
 const MessageActions = findByPropsLazy("getSendMessageOptionsForReply");
@@ -105,6 +118,12 @@ const settings = definePluginSettings({
         description: "Maximum seconds before auto-replying",
         default: 10,
     },
+    autoReplyUserIds: {
+        type: OptionType.STRING,
+        description: "User IDs with auto-reply enabled (managed automatically)",
+        default: "[]",
+        hidden: true,
+    },
 });
 
 const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: { user?: { id: string; }; }) => {
@@ -117,6 +136,7 @@ const UserContextMenuPatch: NavContextMenuPatchCallback = (children, { user }: {
             action={() => {
                 if (active) autoReplyUsers.delete(user.id);
                 else autoReplyUsers.add(user.id);
+                saveAutoReplyUsers();
                 showToast(active ? "Auto-reply stopped" : "Auto-reply started", Toasts.Type.MESSAGE);
             }}
         />
@@ -127,7 +147,28 @@ export default definePlugin({
     name: "CleverReply",
     description: "Adds a button to reply to messages using Cleverbot",
     authors: [{ name: "CleverReply", id: 0n }],
+    dependencies: ["MessageDecorationsAPI", "MemberListDecoratorsAPI"],
     settings,
+
+    start() {
+        loadAutoReplyUsers();
+        addMessageDecoration("vc-cleverreply-auto", props => {
+            if (!autoReplyUsers.has(props?.message?.author?.id)) return null;
+            return (
+                <span style={{ marginLeft: 4, display: "inline-flex", color: "var(--brand-experiment)" }} title="Auto-reply enabled">
+                    <RobotIcon height={16} width={16} />
+                </span>
+            );
+        });
+        addMemberListDecorator("vc-cleverreply-auto", props => {
+            if (!autoReplyUsers.has(props?.user?.id)) return null;
+            return (
+                <span style={{ marginLeft: 4, display: "inline-flex", color: "var(--brand-experiment)" }} title="Auto-reply enabled">
+                    <RobotIcon height={16} width={16} />
+                </span>
+            );
+        });
+    },
 
     contextMenus: {
         "user-context": UserContextMenuPatch,
@@ -168,6 +209,8 @@ export default definePlugin({
         autoReplyUsers.clear();
         pendingCount = 0;
         updateIndicator();
+        removeMessageDecoration("vc-cleverreply-auto");
+        removeMemberListDecorator("vc-cleverreply-auto");
     },
 
     messagePopoverButton: {
