@@ -411,10 +411,12 @@ export default definePlugin({
 
             const isUserAutoReply = autoReplyUsers.has(message.author.id);
             const isChannelAutoReply = autoReplyChannels.has(message.channel_id);
+            // Only reply-to-replies in channels/users that have auto-reply enabled
             const isReplyToMe = settings.store.replyToReplies
+                && (isUserAutoReply || isChannelAutoReply)
                 && message.referenced_message?.author?.id === UserStore.getCurrentUser().id;
 
-            if (!isUserAutoReply && !isChannelAutoReply && !isReplyToMe) return;
+            if (!isUserAutoReply && !isChannelAutoReply) return;
 
             // For channel auto-reply (not user or reply-to-me), roll against the chance slider
             if (isChannelAutoReply && !isUserAutoReply && !isReplyToMe) {
