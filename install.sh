@@ -139,15 +139,18 @@ echo ""
 read -rp "Is Discord fully closed? (Y/n) " ready
 
 if [[ "${ready,,}" == "n" ]]; then
-    warn "Please close Discord, then run: cd $VENCORD_DIR && pnpm inject"
+    warn "Please close Discord, then run: cd $VENCORD_DIR && sudo pnpm inject"
 else
     # Kill any lingering Discord processes
     pkill -f "[Dd]iscord" 2>/dev/null || true
     sleep 2
 
     cd "$VENCORD_DIR"
-    pnpm inject
-    ok "Injection complete."
+    if sudo pnpm inject; then
+        ok "Injection complete."
+    else
+        err "Injection failed. Try manually: cd $VENCORD_DIR && sudo pnpm inject"
+    fi
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
