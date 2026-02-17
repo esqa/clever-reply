@@ -45,6 +45,7 @@ function loadAutoReplyChannels() {
 
 const PendingReplyStore = findByPropsLazy("getPendingReply");
 const MessageActions = findByPropsLazy("getSendMessageOptionsForReply");
+const replyingChannels = new Set<string>();
 let pendingCount = 0;
 let indicatorEl: HTMLDivElement | null = null;
 
@@ -406,6 +407,7 @@ export default definePlugin({
             if (optimistic) return;
             if (message.author.id === UserStore.getCurrentUser().id) return;
             if (!message.content) return;
+            if (replyingChannels.has(message.channel_id)) return;
 
             const isUserAutoReply = autoReplyUsers.has(message.author.id);
             const isChannelAutoReply = autoReplyChannels.has(message.channel_id);
@@ -423,6 +425,7 @@ export default definePlugin({
             const max = settings.store.autoReplyMaxDelay;
             const delay = Math.round((min + Math.random() * (max - min)) * 1000);
 
+            replyingChannels.add(message.channel_id);
             addPending();
 
             try {
@@ -451,6 +454,8 @@ export default definePlugin({
                     Toasts.Type.FAILURE
                 );
             } finally {
+                // Brief cooldown so our own MESSAGE_CREATE doesn't re-trigger
+                setTimeout(() => replyingChannels.delete(message.channel_id), 2000);
                 removePending();
             }
         },
@@ -459,6 +464,7 @@ export default definePlugin({
     stop() {
         autoReplyUsers.clear();
         autoReplyChannels.clear();
+        replyingChannels.clear();
         pendingCount = 0;
         updateIndicator();
         removeMessageDecoration("vc-cleverreply-auto");
